@@ -1,18 +1,13 @@
-﻿using System.Collections.Generic;
-using System.Text;
-using System.Threading;
+﻿using System.Text;
+using System.Text.Json;
 using System.Xml;
-using Newtonsoft.Json;
-using _7DTDWebsockets.Connections;
-
-//original work done by KK
-//removed some unecessary using statements and slight change to authentication method by Mustached_Maniac
+using HarmonyLib;
 
 namespace _7DTDWebsockets
 {
     public class API : IModApi
     {
-        private static HttpConnection Http;
+        private static HttpConnection? Http;
 
         public void InitMod(Mod mod)
         {
@@ -66,7 +61,7 @@ namespace _7DTDWebsockets
             #endregion
 
             Log.Out("[Websocket] Runtime patches initialized");
-            var harmony = new HarmonyLib.Harmony("com.gmail.kk964gaming.websockets.patch");
+            var harmony = new Harmony("com.gmail.kk964gaming.websockets.patch");
             harmony.PatchAll();
 
             foreach (var method in harmony.GetPatchedMethods())
@@ -103,7 +98,7 @@ namespace _7DTDWebsockets
 
         public static void Send(string eventName, object data)
         {
-            Send(eventName, JsonConvert.SerializeObject(data));
+            Send(eventName, JsonSerializer.Serialize(data));
         }
 
         public static void Send(string eventName, string arguments)
@@ -167,7 +162,7 @@ namespace _7DTDWebsockets
                 return true;
             }
 
-            Send("PlayerJoin", JsonConvert.SerializeObject(new PlayerOnlyObj(new Player(clientInfo))));
+            Send("PlayerJoin", JsonSerializer.Serialize(new PlayerOnlyObj(new Player(clientInfo))));
             return true;
         }
 
@@ -178,7 +173,7 @@ namespace _7DTDWebsockets
                 return;
             }
 
-            Send("PlayerLeave", JsonConvert.SerializeObject(new PlayerOnlyObj(new Player(clientInfo))));
+            Send("PlayerLeave", JsonSerializer.Serialize(new PlayerOnlyObj(new Player(clientInfo))));
         }
 
         private sealed class PlayerSpawnIn
@@ -200,7 +195,7 @@ namespace _7DTDWebsockets
                 return;
             }
 
-            Send("PlayerSpawn", JsonConvert.SerializeObject(new PlayerSpawnIn(new Player(clientInfo), respawnType.ToString())));
+            Send("PlayerSpawn", JsonSerializer.Serialize(new PlayerSpawnIn(new Player(clientInfo), respawnType.ToString())));
         }
     }
 }

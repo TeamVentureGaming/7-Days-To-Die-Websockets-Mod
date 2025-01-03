@@ -1,19 +1,16 @@
-﻿using System;
-using System.Collections;
-using System.Collections.Generic;
-using System.IO;
+﻿using System.Collections.Concurrent;
 using System.Net;
 using System.Reflection;
 using System.Text;
-using System.Threading;
+using UnityEngine;
 using WebSocketSharp.Server;
 
-namespace _7DTDWebsockets.Connections
+namespace _7DTDWebsockets
 {
-    internal sealed class HttpConnection
+    public sealed class HttpConnection
     {
         public readonly HttpServer server;
-        private readonly string authentication;
+        private readonly string? authentication;
         private readonly bool hasAuth;
 
         public HttpConnection(int port, string auth)
@@ -30,7 +27,7 @@ namespace _7DTDWebsockets.Connections
             }
 
             server = new HttpServer(port);
-            server.OnGet += (object sender, HttpRequestEventArgs e) =>
+            server.OnGet += (object? sender, HttpRequestEventArgs e) =>
             {
                 var req = e.Request;
                 var res = e.Response;
@@ -52,7 +49,7 @@ namespace _7DTDWebsockets.Connections
 
                 res.Close();
             };
-            server.OnPost += (object sender, HttpRequestEventArgs e) =>
+            server.OnPost += (object? sender, HttpRequestEventArgs e) =>
             {
                 var req = e.Request;
                 var res = e.Response;
@@ -70,12 +67,12 @@ namespace _7DTDWebsockets.Connections
                     return;
                 }
 
-                path = path.Substring("/api".Length);
+                path = path["/api".Length..];
 
                 string content = string.Empty;
                 if (req.HasEntityBody)
                 {
-                    using (var reader = new StreamReader(req.InputStream, req.ContentEncoding))
+                    using (var reader = new StreamReader(req.InputStream, req.ContentEncoding, leaveOpen: false))
                     {
                         content = reader.ReadToEnd();
                     }
@@ -120,7 +117,7 @@ namespace _7DTDWebsockets.Connections
             string auth;
             if (authHeader.StartsWith("Bearer "))
             {
-                auth = authHeader.Substring("Bearer ".Length);
+                auth = authHeader["Bearer ".Length..];
             }
             else
             {
@@ -145,14 +142,14 @@ namespace _7DTDWebsockets.Connections
             {
                 do
                 {
-                    object cmdQueue = queueField.GetValue(sdtd);
+                    object? cmdQueue = queueField.GetValue(sdtd);
                     if (cmdQueue == null)
                     {
                         Log.Warning("Command queue is null.");
                         break;
                     }
 
-                    if (!(cmdQueue is IEnumerable cmds))
+                    if (cmdQueue is not System.Collections.IEnumerable cmds)
                     {
                         Log.Warning("Command queue is not enumerable.");
                         break;
@@ -182,16 +179,49 @@ namespace _7DTDWebsockets.Connections
 
         private static string GetHash(string raw)
         {
-            using (var sha = System.Security.Cryptography.SHA256.Create())
+            byte[] bytes = System.Security.Cryptography.SHA256.HashData(Encoding.UTF8.GetBytes(raw));
+
+            var sb = new StringBuilder();
+            for (int i = 0; i < bytes.Length; i++)
             {
-                byte[] bytes = sha.ComputeHash(Encoding.UTF8.GetBytes(raw));
-                StringBuilder sb = new StringBuilder();
-                for (int i = 0; i < bytes.Length; i++)
-                {
-                    sb.Append(bytes[i].ToString("x2"));
-                }
-                return sb.ToString();
+                sb.Append(bytes[i].ToString("x2"));
             }
+            return sb.ToString();
+        }
+    }
+
+    public sealed class ConsoleConnection : ConsoleConnectionAbstract
+    {
+        private readonly ConcurrentQueue<string> lines = [];
+
+        public override string GetDescription() => "Websocket Mod Console";
+
+        public override void SendLine(string _text) => lines.Enqueue(_text);
+
+        public override void SendLines(List<string> _output)
+        {
+            foreach (string line in _output)
+            {
+                SendLine(line);
+            }
+        }
+
+        public override void SendLog(string _formattedMessage, string _plainMessage, string _trace, LogType _type, DateTime _timestamp, long _uptime)
+        {
+            if (!IsLogLevelEnabled(_type)) return;
+            SendLine(_formattedMessage);
+        }
+
+        public List<string> GetSentLines() => [.. lines];
+    }
+
+    public sealed class WebsocketConnection : WebSocketBehavior
+    {
+        public static readonly WebsocketConnection WebSocketInstance = new ();
+
+        public void SendBroadcast(string msg)
+        {
+            Sessions.Broadcast(msg);
         }
     }
 }

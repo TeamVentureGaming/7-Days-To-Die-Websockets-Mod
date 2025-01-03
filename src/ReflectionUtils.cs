@@ -4,7 +4,7 @@ namespace _7DTDWebsockets
 {
     public static class ReflectionUtils
     {
-        public static object GetValue(this object obj, string field)
+        public static object? GetValue(this object? obj, string? field)
         {
             if (obj == null)
             {
