@@ -59,7 +59,8 @@ To install you need to either download a release, or build the mod yourself.
 8. Copy `ModInfo.xml` to the new folder
 9. Copy `Config.xml` to the new folder
 10. Copy `websocket-sharp.dll` to the new folder
-11. Restart the game
+11. Copy all dlls whose name starts with `System` or `Microsoft` to the new folder
+12. Restart the game
 
 ### Config.xml
 
