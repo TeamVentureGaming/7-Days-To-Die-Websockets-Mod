@@ -87,9 +87,12 @@ namespace _7DTDWebsockets
             Log.Out($"[Websocket] Starting api on port: {port}");
             new Thread(() =>
             {
+                DebugLog.Out("[Websocket] Initializing server");
                 Http = new HttpConnection(port, auth);
                 Http.server.AddWebSocketService<WebsocketConnection>("/");
+                DebugLog.Out("[Websocket] Starting server");
                 Http.server.Start();
+                DebugLog.Out("[Websocket] Started server");
             })
             {
                 IsBackground = true
@@ -114,11 +117,22 @@ namespace _7DTDWebsockets
         public static void Send(string message)
         {
             // TODO: not sure why we need to check if Http null here
-            if (Http == null || WebsocketConnection.WebSocketInstance == null)
+            if (Http == null)
             {
+                DebugLog.Out("[Websocket] Http is null, cannot send message");
                 return;
             }
 
+            if (WebsocketConnection.WebSocketInstance == null)
+            {
+                DebugLog.Out("[Websocket] WebsocketConnection is null, cannot send message");
+                return;
+            }
+
+// avoid formatting the message if not in debug mode
+#if DEBUG
+            Log.Out($"[Websocket] Sending message: {message}");
+#endif
             WebsocketConnection.WebSocketInstance.SendBroadcast(message);
         }
 
@@ -146,6 +160,10 @@ namespace _7DTDWebsockets
                 return true;
             }
 
+// avoid formatting the message if not in debug mode
+#if DEBUG
+            Log.Out($"[Websocket] Chat type: {chatType}, message: {message}");
+#endif
             Send("ChatMessage", new ChatMsg(new Player(clientInfo), message));
             return true;
         }

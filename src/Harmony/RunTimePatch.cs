@@ -91,50 +91,74 @@ namespace _7DTDWebsockets.patchs
 
         public static bool Prefix(EntityAlive __instance)
         {
+            DebugLog.Out("[PatchEntityDeath] Prefix start");
             if (__instance is EntityPlayer)
             {
+                DebugLog.Out("[PatchEntityDeath] instance is EntityPlayer, returning true");
+                // TODO: send player died event
                 return true;
             }
 
+            DebugLog.Out("[PatchEntityDeath] traversing for entityThatKilledMe");
             var obj = Traverse.Create(__instance).Field("entityThatKilledMe").GetValue();
             if (obj == null)
             {
+                DebugLog.Out("[PatchEntityDeath] traverse found no match, returning true");
                 return true;
             }
 
             if (!(obj is EntityPlayer player))
             {
+                DebugLog.Out("[PatchEntityDeath] found entityThatKilledMe but it was not a EntityPlayer, returning true");
                 return true;
             }
 
             string entityNameLower = __instance.GetDebugName().ToLower();
+// avoid formatting the message if not in debug mode
+#if DEBUG
+            Log.Out($"[PatchEntityDeath] entityNameLower: {entityNameLower}");
+#endif
 
             bool isAnimal = false;
             bool isZombie = false;
 
             if (entityNameLower.Contains("animal"))
             {
+                DebugLog.Out("[PatchEntityDeath] entityNameLower contains animal");
                 isAnimal = true;
-                animalEntityNameRegex.Replace(entityNameLower, "");
+                entityNameLower = animalEntityNameRegex.Replace(entityNameLower, "");
+// avoid formatting the message if not in debug mode
+#if DEBUG
+                Log.Out($"[PatchEntityDeath] entityNameLower after animalEntityNameRegex: {entityNameLower}");
+#endif
             }
 
             if (entityNameLower.Contains("zombie"))
             {
+                DebugLog.Out("[PatchEntityDeath] entityNameLower contains zombie");
                 isZombie = true;
-                zombieEntityNameRegex.Replace(entityNameLower, "");
+                entityNameLower = zombieEntityNameRegex.Replace(entityNameLower, "");
+// avoid formatting the message if not in debug mode
+#if DEBUG
+                Log.Out($"[PatchEntityDeath] entityNameLower after zombieEntityNameRegex: {entityNameLower}");
+#endif
             }
 
+            DebugLog.Out("[PatchEntityDeath] sending PlayerKillEntity event");
             API.Send("PlayerKillEntity", JsonConvert.SerializeObject(new PlayerKillEntityEvent(new Player(player), entityNameLower, isAnimal, isZombie, player.inventory.holdingItem.Name, IsHeadshot)));
 
             if (isZombie)
             {
+                DebugLog.Out("[PatchEntityDeath] sending PlayerKillZombie event");
                 API.Send("PlayerKillZombie", JsonConvert.SerializeObject(new PlayerEntityEvent(new Player(player), entityNameLower)));
             }
             else if (isAnimal)
             {
+                DebugLog.Out("[PatchEntityDeath] sending PlayerKillAnimal event");
                 API.Send("PlayerKillAnimal", JsonConvert.SerializeObject(new PlayerEntityEvent(new Player(player), entityNameLower)));
             }
 
+            DebugLog.Out("[PatchEntityDeath] Prefix end, returning true");
             return true;
         }
     }
@@ -144,7 +168,12 @@ namespace _7DTDWebsockets.patchs
     {
         public static void Postfix(DamageResponse __result)
         {
-            PatchEntityDeath.IsHeadshot = __result.HitBodyPart == EnumBodyPartHit.Head; // TODO: this seems very, very wrong
+            var isHeadshot = __result.HitBodyPart == EnumBodyPartHit.Head;
+            PatchEntityDeath.IsHeadshot = isHeadshot; // TODO: this seems very, very wrong
+// avoid formatting the message if not in debug mode
+#if DEBUG
+            Log.Out($"[PatchDamageEntityLocal] Postfix, isHeadshot: {isHeadshot}");
+#endif
         }
     }
 
@@ -156,7 +185,12 @@ namespace _7DTDWebsockets.patchs
         public static void DamageEntityPacketProccessPrefix(NetPackage __instance, World _world, GameManager _callbacks)
         {
             // TODO: seems like maybe this should be pattern matching on the type?
-            if (NetPackageManager.GetPackageName(__instance.PackageId) != nameof(NetPackageDamageEntity))
+            var packageName = NetPackageManager.GetPackageName(__instance.PackageId);
+// avoid formatting the message if not in debug mode
+#if DEBUG
+            Log.Out($"[DamagePatches] DamageEntityPacketProccessPrefix => package id: {__instance.PackageId}, package name: {packageName}");
+#endif
+            if (packageName != nameof(NetPackageDamageEntity))
             {
                 return;
             }
@@ -168,6 +202,7 @@ namespace _7DTDWebsockets.patchs
                 return;
             }
 
+            DebugLog.Out("[DamagePatches] DamageEntityPacketProccessPrefix sending PlayerDamage event.");
             API.Send("PlayerDamage", JsonConvert.SerializeObject(new PlayerDmgEvent(new Player(entityPlayer), damage.damageTyp.ToString(), damage.strength)));
         }
 
@@ -180,6 +215,7 @@ namespace _7DTDWebsockets.patchs
                 return;
             }
 
+            DebugLog.Out("[DamagePatches] EntityAliveDamagePrefix sending PlayerDamage event.");
             API.Send("PlayerDamage", JsonConvert.SerializeObject(new PlayerDmgEvent(new Player(player), _damageSource.damageType.ToString(), _strength)));
             return;
         }
