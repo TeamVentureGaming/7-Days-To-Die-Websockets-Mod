@@ -16,7 +16,6 @@ if [ ! -d "$GAME_DIR" ]; then
 fi
 
 # Expected files
-#   GAME_DIR/7DaysToDie_Data/Managed/0Harmony.dll
 #   GAME_DIR/7DaysToDie_Data/Managed/Assembly-CSharp.dll
 #   GAME_DIR/7DaysToDie_Data/Managed/LogLibrary.dll
 #   GAME_DIR/7DaysToDie_Data/Managed/UnityEngine.dll
@@ -30,7 +29,6 @@ verify_file() {
   fi
 }
 
-verify_file "$GAME_DIR/7DaysToDie_Data/Managed/0Harmony.dll"
 verify_file "$GAME_DIR/7DaysToDie_Data/Managed/Assembly-CSharp.dll"
 verify_file "$GAME_DIR/7DaysToDie_Data/Managed/LogLibrary.dll"
 verify_file "$GAME_DIR/7DaysToDie_Data/Managed/UnityEngine.dll"
@@ -57,7 +55,6 @@ copy_file() {
   fi
 }
 
-copy_file "$GAME_DIR/7DaysToDie_Data/Managed/0Harmony.dll" "$LOCAL_REFS_DIR/0Harmony.dll"
 copy_file "$GAME_DIR/7DaysToDie_Data/Managed/Assembly-CSharp.dll" "$LOCAL_REFS_DIR/Assembly-CSharp.dll"
 copy_file "$GAME_DIR/7DaysToDie_Data/Managed/LogLibrary.dll" "$LOCAL_REFS_DIR/LogLibrary.dll"
 copy_file "$GAME_DIR/7DaysToDie_Data/Managed/UnityEngine.dll" "$LOCAL_REFS_DIR/UnityEngine.dll"

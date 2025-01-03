@@ -12,7 +12,6 @@ if (-not (Test-Path -Path $GameDir -PathType Container)) {
 }
 
 # Expected files
-#   GameDir/7DaysToDie_Data/Managed/0Harmony.dll
 #   GameDir/7DaysToDie_Data/Managed/Assembly-CSharp.dll
 #   GameDir/7DaysToDie_Data/Managed/LogLibrary.dll
 #   GameDir/7DaysToDie_Data/Managed/UnityEngine.dll
@@ -31,7 +30,6 @@ function Verify-File {
     }
 }
 
-Verify-File "$GameDir/7DaysToDie_Data/Managed/0Harmony.dll"
 Verify-File "$GameDir/7DaysToDie_Data/Managed/Assembly-CSharp.dll"
 Verify-File "$GameDir/7DaysToDie_Data/Managed/LogLibrary.dll"
 Verify-File "$GameDir/7DaysToDie_Data/Managed/UnityEngine.dll"
@@ -61,7 +59,6 @@ function Copy-File {
     Copy-Item -Path $Source -Destination $Destination -Force -ErrorAction Stop
 }
 
-Copy-File "$GameDir/7DaysToDie_Data/Managed/0Harmony.dll" "$LocalRefsDir/0Harmony.dll"
 Copy-File "$GameDir/7DaysToDie_Data/Managed/Assembly-CSharp.dll" "$LocalRefsDir/Assembly-CSharp.dll"
 Copy-File "$GameDir/7DaysToDie_Data/Managed/LogLibrary.dll" "$LocalRefsDir/LogLibrary.dll"
 Copy-File "$GameDir/7DaysToDie_Data/Managed/UnityEngine.dll" "$LocalRefsDir/UnityEngine.dll"
