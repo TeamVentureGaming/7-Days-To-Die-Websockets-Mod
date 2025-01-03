@@ -1,9 +1,8 @@
-﻿using System.Xml;
+﻿using System.Collections.Generic;
 using System.Text;
 using System.Threading;
-using System.Collections.Generic;
+using System.Xml;
 using Newtonsoft.Json;
-using _7DTDWebsockets.patchs;
 using _7DTDWebsockets.Connections;
 
 //original work done by KK
@@ -13,36 +12,38 @@ namespace _7DTDWebsockets
 {
     public class API : IModApi
     {
-        public static API Instance { get; private set; }
         private static HttpConnection Http;
 
         public void InitMod(Mod mod)
         {
-            Instance = this;
             string path = ModManager.GetMod("WebsocketIntegration").Path + "/Config.xml";
-            
-            XmlReaderSettings settings = new XmlReaderSettings();
-            settings.ConformanceLevel = ConformanceLevel.Fragment;
-            settings.IgnoreWhitespace = true;
-            settings.IgnoreComments = true;
-            XmlReader reader = XmlReader.Create(path, settings);
 
-            Dictionary<string, object> data = new Dictionary<string, object>();
+            XmlReader reader = XmlReader.Create(path, new XmlReaderSettings
+            {
+                ConformanceLevel = ConformanceLevel.Fragment,
+                IgnoreWhitespace = true,
+                IgnoreComments = true
+            });
+
+            // TODO: redo this to not load all the properties, and just grab the ones it needs directly
+            #region REDO ME
+            var data = new Dictionary<string, string>();
 
             Log.Out($"[Websocket] Attempting read of \"{path}\"");
 
             while (reader.Read())
             {
-                if (reader.IsStartElement())
+                // NOTE: in the original code, this was returning when IsEmptyElement was true,
+                // but that seems wrong so I changed it here to just skip that element
+                if (reader.IsStartElement() && !reader.IsEmptyElement)
                 {
-                    if (reader.IsEmptyElement) return;
-                    string n;
-                    string s;
-                    n = reader.Name;
+                    var n = reader.Name;
                     reader.Read();
-                    if (reader.IsStartElement()) n = reader.Name;
-                    s = reader.ReadString();
-                    data.Add(n, s);
+                    if (reader.IsStartElement())
+                    {
+                        n = reader.Name;
+                    }
+                    data.Add(n, reader.ReadString());
                 }
             }
 
@@ -51,12 +52,28 @@ namespace _7DTDWebsockets
                 Log.Out($"[Websocket] Config: {i.Key} : {i.Value}");
             }
 
-            int port = 9000;
-            string auth = "";
-            if (data.ContainsKey("Port")) port = int.Parse(((data["Port"] ?? "9000")).ToString());
-            if (data.ContainsKey("Authentication")) auth = (data["Authentication"] ?? string.Empty).ToString();
+            if (!data.TryGetValue("Port", out var value) || !int.TryParse(value?.ToString(), out var port))
+            {
+                Log.Out("[Websocket] Port not found or invalid, defaulting to 9000");
+                port = 9000;
+            }
 
-            RunTimePatch.PatchAll();
+            if (!data.TryGetValue("Authentication", out var auth))
+            {
+                Log.Out("[Websocket] No authentication key found, defaulting to empty string");
+                auth = "";
+            }
+            #endregion
+
+            Log.Out("[Websocket] Runtime patches initialized");
+            var harmony = new HarmonyLib.Harmony("com.gmail.kk964gaming.websockets.patch");
+            harmony.PatchAll();
+
+            foreach (var method in harmony.GetPatchedMethods())
+            {
+                Log.Out($"Successfully patched: {method.Name}");
+            }
+
             StartConnection(port, auth);
             ModEvents.GameShutdown.RegisterHandler(GameShutdown);
             ModEvents.ChatMessage.RegisterHandler(ChatMessage);
@@ -65,7 +82,7 @@ namespace _7DTDWebsockets
             ModEvents.PlayerSpawnedInWorld.RegisterHandler(PlayerSpawnedInWorld);
         }
 
-        private void StartConnection(int port, string auth)
+        private static void StartConnection(int port, string auth)
         {
             Log.Out($"[Websocket] Starting api on port: {port}");
             new Thread(() =>
@@ -73,12 +90,20 @@ namespace _7DTDWebsockets
                 Http = new HttpConnection(port, auth);
                 Http.server.AddWebSocketService<WebsocketConnection>("/");
                 Http.server.Start();
-            }).Start();
+            })
+            {
+                IsBackground = true
+            }.Start();
         }
 
-        private void StopConnection()
+        private static void StopConnection()
         {
-            if (Http != null) Http.server.Stop();
+            Http?.server.Stop();
+        }
+
+        public static void Send(string eventName, object data)
+        {
+            Send(eventName, JsonConvert.SerializeObject(data));
         }
 
         public static void Send(string eventName, string arguments)
@@ -88,7 +113,12 @@ namespace _7DTDWebsockets
 
         public static void Send(string message)
         {
-            if (Http == null || WebsocketConnection.WebSocketInstance == null) return;
+            // TODO: not sure why we need to check if Http null here
+            if (Http == null || WebsocketConnection.WebSocketInstance == null)
+            {
+                return;
+            }
+
             WebsocketConnection.WebSocketInstance.SendBroadcast(message);
         }
 
@@ -97,51 +127,65 @@ namespace _7DTDWebsockets
             StopConnection();
         }
 
-
-        private class ChatMsg
+        private sealed class ChatMsg
         {
-            public Player player;
-            public string Message;
+            public readonly Player player;
+            public readonly string Message;
+
             public ChatMsg(Player pl, string msg)
             {
-                player = pl;
-                Message = msg;
+                this.player = pl;
+                this.Message = msg;
             }
         }
-        private bool ChatMessage(ClientInfo clientInfo, EChatType chatType, int senderId, string message, string mainName, bool localizeMain, List<int> recipientEntityIds)
+
+        private bool ChatMessage(ClientInfo clientInfo, EChatType chatType, int senderId, string message, string mainName, List<int> recipientEntityIds)
         {
-            if (clientInfo == null || string.IsNullOrEmpty(message)) return true;
-            ChatMsg m = new ChatMsg(new Player(clientInfo), message);
-            Send("ChatMessage", JsonConvert.SerializeObject(m));
+            if (clientInfo == null || string.IsNullOrEmpty(message))
+            {
+                return true;
+            }
+
+            Send("ChatMessage", new ChatMsg(new Player(clientInfo), message));
             return true;
         }
 
-        private class PlayerOnlyObj
+        private sealed class PlayerOnlyObj
         {
-            public Player player;
+            public readonly Player player;
+
             public PlayerOnlyObj(Player pl)
             {
-                player = pl;
+                this.player = pl;
             }
         }
 
         private bool PlayerLogin(ClientInfo clientInfo, string noIdea, StringBuilder stringBuilder)
         {
-            if (clientInfo == null) return true;
+            if (clientInfo == null)
+            {
+                return true;
+            }
+
             Send("PlayerJoin", JsonConvert.SerializeObject(new PlayerOnlyObj(new Player(clientInfo))));
             return true;
         }
 
         private void PlayerDisconnect(ClientInfo clientInfo, bool idk)
         {
-            if (clientInfo == null) return;
+            if (clientInfo == null)
+            {
+                return;
+            }
+
             Send("PlayerLeave", JsonConvert.SerializeObject(new PlayerOnlyObj(new Player(clientInfo))));
         }
 
-        class PlayerSpawnIn
+        private sealed class PlayerSpawnIn
         {
-            public Player player;
-            public string type;
+            public readonly Player player;
+            public readonly string type;
+
             public PlayerSpawnIn(Player player, string type)
             {
                 this.player = player;
@@ -151,23 +195,12 @@ namespace _7DTDWebsockets
 
         private void PlayerSpawnedInWorld(ClientInfo clientInfo, RespawnType respawnType, Vector3i vector3I)
         {
-            if (clientInfo == null) return;
-            Send("PlayerSpawnIn", JsonConvert.SerializeObject(new PlayerSpawnIn(new Player(clientInfo), respawnType.ToString())));
-        }
-
-        public class Player
-        {
-            public string name;
-
-            public Player (ClientInfo clientInfo)
+            if (clientInfo == null)
             {
-                this.name = clientInfo.playerName ?? "Unknwon";
+                return;
             }
 
-            public Player (EntityPlayer player)
-            {
-                this.name = player.EntityName;
-            }
+            Send("PlayerSpawn", JsonConvert.SerializeObject(new PlayerSpawnIn(new Player(clientInfo), respawnType.ToString())));
         }
     }
 }

@@ -5,13 +5,9 @@
 
 namespace _7DTDWebsockets.Connections
 {
-    internal class WebsocketConnection : WebSocketBehavior
+    internal sealed class WebsocketConnection : WebSocketBehavior
     {
-        public static WebsocketConnection WebSocketInstance;
-        public WebsocketConnection()
-        {
-            WebSocketInstance = this;
-        }
+        public static readonly WebsocketConnection WebSocketInstance = new WebsocketConnection();
 
         public void SendBroadcast(string msg)
         {

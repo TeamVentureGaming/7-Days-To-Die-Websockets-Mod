@@ -1,5 +1,7 @@
 ﻿using System;
+using System.Collections.Concurrent;
 using System.Collections.Generic;
+using System.Linq;
 using UnityEngine;
 
 //original work done by KK
@@ -7,15 +9,13 @@ using UnityEngine;
 
 namespace _7DTDWebsockets.Connections
 {
-    internal class ConsoleConnection : ConsoleConnectionAbstract
+    internal sealed class ConsoleConnection : ConsoleConnectionAbstract
     {
-        public List<string> lines;
-
-        public ConsoleConnection() => lines = new List<string>();
+        private readonly ConcurrentQueue<string> lines = new ConcurrentQueue<string>();
 
         public override string GetDescription() => "Websocket Mod Console";
 
-        public override void SendLine(string _text) => lines.Add(_text);
+        public override void SendLine(string _text) => lines.Enqueue(_text);
 
         public override void SendLines(List<string> _output)
         {
@@ -30,5 +30,7 @@ namespace _7DTDWebsockets.Connections
             if (!IsLogLevelEnabled(_type)) return;
             SendLine(_formattedMessage);
         }
+
+        public List<string> GetSentLines() => lines.ToList();
     }
 }

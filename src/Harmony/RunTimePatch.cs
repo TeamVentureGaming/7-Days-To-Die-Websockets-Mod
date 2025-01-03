@@ -1,6 +1,4 @@
-﻿using System;
-using System.Reflection;
-using System.Text.RegularExpressions;
+﻿using System.Text.RegularExpressions;
 using Newtonsoft.Json;
 using HarmonyLib;
 
@@ -9,56 +7,12 @@ using HarmonyLib;
 
 namespace _7DTDWebsockets.patchs
 {
-    internal class RunTimePatch
+    public sealed class PlayerDmgEvent
     {
-        public static bool IsHeadshot { get; set; } = false;
+        public readonly Player player;
+        public readonly string cause;
+        public readonly int damage;
 
-        public static void PatchAll()
-        {
-            Log.Out("[Websocket] Runtime patches initialized");
-            Harmony harmony = new Harmony("com.gmail.kk964gaming.websockets.patch");
-            harmony.PatchAll();
-
-            foreach (var method in harmony.GetPatchedMethods())
-            {
-                Log.Out($"Successfully patched: {method.Name}");
-            }
-        }
-    }
-
-    class ReflectionUtils
-    {
-        public static object GetValue(object obj, string field)
-        {
-            if (obj == null) return null;
-            if (field == null) return null;
-            Type type = obj.GetType();
-            FieldInfo info = type.GetField(field, BindingFlags.NonPublic | BindingFlags.Instance);
-            if (info == null) return null;
-            return info.GetValue(obj);
-        }
-    }
-
-    public class Player
-    {
-        public string name;
-
-        public Player(ClientInfo clientInfo)
-        {
-            this.name = clientInfo.playerName ?? "Unknown";
-        }
-
-        public Player(EntityPlayer player)
-        {
-            this.name = player.EntityName;
-        }
-    }
-
-    class PlayerDmgEvent
-    {
-        public Player player;
-        public string cause;
-        public int damage;
         public PlayerDmgEvent(Player player, string cause, int damage)
         {
             this.player = player;
@@ -67,14 +21,15 @@ namespace _7DTDWebsockets.patchs
         }
     }
 
-    class PlayerKillEntityEvent
+    public sealed class PlayerKillEntityEvent
     {
-        public Player player;
-        public string entity;
-        public bool animal;
-        public bool zombie;
-        public string weaponType;
-        public bool headshot;
+        public readonly Player player;
+        public readonly string entity;
+        public readonly bool animal;
+        public readonly bool zombie;
+        public readonly string weaponType;
+        public readonly bool headshot;
+
         public PlayerKillEntityEvent(Player player, string entity, bool animal, bool zombie, string weaponType, bool headshot)
         {
             this.player = player;
@@ -86,10 +41,11 @@ namespace _7DTDWebsockets.patchs
         }
     }
 
-    class PlayerEntityEvent
+    public sealed class PlayerEntityEvent
     {
-        public Player player;
-        public string entity;
+        public readonly Player player;
+        public readonly string entity;
+
         public PlayerEntityEvent(Player player, string entity)
         {
             this.player = player;
@@ -97,101 +53,134 @@ namespace _7DTDWebsockets.patchs
         }
     }
 
-    class PlayerOnlyEvent
+    public sealed class PlayerOnlyEvent
     {
-        public Player player;
+        public readonly Player player;
+
         public PlayerOnlyEvent(Player player)
         {
             this.player = player;
         }
     }
 
-    class PlayerDeathEvent
+    public sealed class PlayerDeathEvent
     {
-        public Player player;
+        public readonly Player player;
+
         public PlayerDeathEvent(Player player)
         {
             this.player = player;
         }
     }
 
-    //updated payload to include weaponType and headshot bool
     [HarmonyPatch(typeof(EntityAlive), "SetDead")]
-    class PatchEntityDeath
+    public static /*partial*/ class PatchEntityDeath
     {
-        static bool Prefix(EntityAlive __instance)
+        // if the [GeneratedRegex] attribute can't be used, still prefer static, compiled Regex fields
+        private static readonly Regex animalEntityNameRegex = new Regex(@"(animal)", RegexOptions.Compiled);
+        private static readonly Regex zombieEntityNameRegex = new Regex(@"(zombie)", RegexOptions.Compiled);
+
+        // using the [GeneratedRegex] attribute, the regex is compiled at build time!
+        //[GeneratedRegex(@"(animal)")]
+        //private static partial Regex AnimalEntityNameRegex();
+
+        //[GeneratedRegex(@"(zombie)")]
+        //private static partial Regex ZombieEntityNameRegex();
+
+        public static bool IsHeadshot; // TODO: this seems very, very wrong
+
+        public static bool Prefix(EntityAlive __instance)
         {
-            object obj = Traverse.Create(__instance).Field("entityThatKilledMe").GetValue();
-            if (__instance is EntityPlayer) return true;
-            if (obj == null) return true;
-            EntityAlive whokilledMe = (EntityAlive)obj;
-            if (whokilledMe == null) return true;
-            if (!(whokilledMe is EntityPlayer)) return true;
-            EntityPlayer player = whokilledMe as EntityPlayer;
-            string ent = __instance.GetDebugName();
-
-            bool animal = false;
-            bool zombie = false;
-
-            if (ent.ToLower().Contains("animal")) animal = true;
-            if (ent.ToLower().Contains("zombie")) zombie = true;
-
-            if (animal) ent = Regex.Replace(ent, "(animal)", "", RegexOptions.IgnoreCase);
-            if (zombie) ent = Regex.Replace(ent, "(zombie)", "", RegexOptions.IgnoreCase);
-
-            string weaponType = player.inventory.holdingItem.Name;
-            bool headshot = RunTimePatch.IsHeadshot;
-
-            _7DTDWebsockets.API.Send("PlayerKillEntity", JsonConvert.SerializeObject(new PlayerKillEntityEvent(new Player(player), ent, animal, zombie, weaponType, headshot)));
-
-            if (animal && !zombie)
+            if (__instance is EntityPlayer)
             {
-                _7DTDWebsockets.API.Send("PlayerKillAnimal", JsonConvert.SerializeObject(new PlayerEntityEvent(new Player(player), ent)));
+                return true;
             }
 
-            if (zombie)
+            var obj = Traverse.Create(__instance).Field("entityThatKilledMe").GetValue();
+            if (obj == null)
             {
-                _7DTDWebsockets.API.Send("PlayerKillZombie", JsonConvert.SerializeObject(new PlayerEntityEvent(new Player(player), ent)));
+                return true;
+            }
+
+            if (!(obj is EntityPlayer player))
+            {
+                return true;
+            }
+
+            string entityNameLower = __instance.GetDebugName().ToLower();
+
+            bool isAnimal = false;
+            bool isZombie = false;
+
+            if (entityNameLower.Contains("animal"))
+            {
+                isAnimal = true;
+                animalEntityNameRegex.Replace(entityNameLower, "");
+            }
+
+            if (entityNameLower.Contains("zombie"))
+            {
+                isZombie = true;
+                zombieEntityNameRegex.Replace(entityNameLower, "");
+            }
+
+            API.Send("PlayerKillEntity", JsonConvert.SerializeObject(new PlayerKillEntityEvent(new Player(player), entityNameLower, isAnimal, isZombie, player.inventory.holdingItem.Name, IsHeadshot)));
+
+            if (isZombie)
+            {
+                API.Send("PlayerKillZombie", JsonConvert.SerializeObject(new PlayerEntityEvent(new Player(player), entityNameLower)));
+            }
+            else if (isAnimal)
+            {
+                API.Send("PlayerKillAnimal", JsonConvert.SerializeObject(new PlayerEntityEvent(new Player(player), entityNameLower)));
             }
 
             return true;
         }
     }
-    //added to check for the headshots
+
     [HarmonyPatch(typeof(EntityAlive), "damageEntityLocal")]
-    class PatchDamageEntityLocal
+    public static class PatchDamageEntityLocal
     {
-        static void Postfix(DamageResponse __result)
+        public static void Postfix(DamageResponse __result)
         {
-            RunTimePatch.IsHeadshot = __result.HitBodyPart == EnumBodyPartHit.Head;
+            PatchEntityDeath.IsHeadshot = __result.HitBodyPart == EnumBodyPartHit.Head; // TODO: this seems very, very wrong
         }
     }
-    //included the headshot tag with the payload
+
     [HarmonyPatch]
-    class DamagePatches
+    public static class DamagePatches
     {
         [HarmonyPrefix]
         [HarmonyPatch(typeof(NetPackageDamageEntity), "ProcessPackage")]
-        static void DamageEntityPacketProccessPrefix(NetPackage __instance, World _world, GameManager _callbacks)
+        public static void DamageEntityPacketProccessPrefix(NetPackage __instance, World _world, GameManager _callbacks)
         {
-            string name = NetPackageManager.GetPackageName(__instance.PackageId);
-            if (name != "NetPackageDamageEntity") return;
+            // TODO: seems like maybe this should be pattern matching on the type?
+            if (NetPackageManager.GetPackageName(__instance.PackageId) != nameof(NetPackageDamageEntity))
+            {
+                return;
+            }
+
             NetPackageDamageEntity damage = (NetPackageDamageEntity)__instance;
-            int entityId = (int)ReflectionUtils.GetValue(damage, "entityId");
-            Entity entity = _world.GetEntity(entityId);
-            if (entity == null || !(entity is EntityPlayer)) return;
-            EnumDamageTypes damageType = (EnumDamageTypes)ReflectionUtils.GetValue(damage, "damageTyp");
-            int dmg = (ushort)ReflectionUtils.GetValue(damage, "strength");
-            _7DTDWebsockets.API.Send("PlayerDamage", JsonConvert.SerializeObject(new PlayerDmgEvent(new Player((EntityPlayer)entity), damageType.ToString(), dmg)));
+            Entity entity = _world.GetEntity(damage.entityId);
+            if (entity == null || !(entity is EntityPlayer entityPlayer))
+            {
+                return;
+            }
+
+            API.Send("PlayerDamage", JsonConvert.SerializeObject(new PlayerDmgEvent(new Player(entityPlayer), damage.damageTyp.ToString(), damage.strength)));
         }
 
         [HarmonyPrefix]
         [HarmonyPatch(typeof(EntityAlive), "DamageEntity")]
-        static void EntityAliveDamagePrefix(EntityAlive __instance, DamageSource _damageSource, int _strength, bool _criticalHit, float _impulseScale = 1f)
+        public static void EntityAliveDamagePrefix(EntityAlive __instance, DamageSource _damageSource, int _strength, bool _criticalHit, float _impulseScale = 1f)
         {
-            if (!(__instance is EntityPlayer)) return;
-            EntityPlayer player = (EntityPlayer)__instance;
-            _7DTDWebsockets.API.Send("PlayerDamage", JsonConvert.SerializeObject(new PlayerDmgEvent(new Player(player), _damageSource.damageType.ToString(), _strength)));
+            if (!(__instance is EntityPlayer player))
+            {
+                return;
+            }
+
+            API.Send("PlayerDamage", JsonConvert.SerializeObject(new PlayerDmgEvent(new Player(player), _damageSource.damageType.ToString(), _strength)));
             return;
         }
     }
