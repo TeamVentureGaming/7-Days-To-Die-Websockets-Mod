@@ -67,12 +67,20 @@ namespace _7DTDWebsockets
                     return;
                 }
 
+#if NET8_0_OR_GREATER
                 path = path["/api".Length..];
+#else
+                path = path.Substring("/api".Length);
+#endif
 
                 string content = string.Empty;
                 if (req.HasEntityBody)
                 {
+#if NET8_0_OR_GREATER
                     using (var reader = new StreamReader(req.InputStream, req.ContentEncoding, leaveOpen: false))
+#else
+                    using (var reader = new StreamReader(req.InputStream, req.ContentEncoding))
+#endif
                     {
                         content = reader.ReadToEnd();
                     }
@@ -117,7 +125,11 @@ namespace _7DTDWebsockets
             string auth;
             if (authHeader.StartsWith("Bearer "))
             {
+#if NET8_0_OR_GREATER
                 auth = authHeader["Bearer ".Length..];
+#else
+                auth = authHeader.Substring("Bearer ".Length);
+#endif
             }
             else
             {
@@ -177,6 +189,7 @@ namespace _7DTDWebsockets
             return console.GetSentLines();
         }
 
+#if NET8_0_OR_GREATER
         private static string GetHash(string raw)
         {
             byte[] bytes = System.Security.Cryptography.SHA256.HashData(Encoding.UTF8.GetBytes(raw));
@@ -188,6 +201,21 @@ namespace _7DTDWebsockets
             }
             return sb.ToString();
         }
+#else
+        private static string GetHash(string raw)
+        {
+            using (var sha = System.Security.Cryptography.SHA256.Create())
+            {
+                byte[] bytes = sha.ComputeHash(Encoding.UTF8.GetBytes(raw));
+                var sb = new StringBuilder();
+                for (int i = 0; i < bytes.Length; i++)
+                {
+                    sb.Append(bytes[i].ToString("x2"));
+                }
+                return sb.ToString();
+            }
+        }
+#endif
     }
 
     public sealed class ConsoleConnection : ConsoleConnectionAbstract
