@@ -217,7 +217,13 @@ namespace _7DTDWebsockets
 
     public sealed class WebsocketConnection : WebSocketBehavior
     {
-        public static readonly WebsocketConnection WebSocketInstance = new ();
+        public static WebsocketConnection? WebSocketInstance;
+
+        public WebsocketConnection()
+        {
+            DebugLog.Out("[Websocket] WebsocketConnection created");
+            WebSocketInstance = this;
+        }
 
         public void SendBroadcast(string msg)
         {
