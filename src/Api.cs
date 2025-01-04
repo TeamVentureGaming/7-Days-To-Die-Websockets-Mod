@@ -185,7 +185,7 @@ namespace _7DTDWebsockets
                 return true;
             }
 
-            Send("PlayerJoin", JsonConvert.SerializeObject(new PlayerOnlyObj(new Player(clientInfo))));
+            Send("PlayerJoin", new PlayerOnlyObj(new Player(clientInfo)));
             return true;
         }
 
@@ -196,7 +196,7 @@ namespace _7DTDWebsockets
                 return;
             }
 
-            Send("PlayerLeave", JsonConvert.SerializeObject(new PlayerOnlyObj(new Player(clientInfo))));
+            Send("PlayerLeave", new PlayerOnlyObj(new Player(clientInfo)));
         }
 
         private sealed class PlayerSpawnIn
@@ -218,7 +218,7 @@ namespace _7DTDWebsockets
                 return;
             }
 
-            Send("PlayerSpawn", JsonConvert.SerializeObject(new PlayerSpawnIn(new Player(clientInfo), respawnType.ToString())));
+            Send("PlayerSpawn", new PlayerSpawnIn(new Player(clientInfo), respawnType.ToString()));
         }
     }
 }

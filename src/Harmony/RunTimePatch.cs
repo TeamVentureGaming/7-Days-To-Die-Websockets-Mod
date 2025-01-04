@@ -1,5 +1,4 @@
 ﻿using System.Text.RegularExpressions;
-using Newtonsoft.Json;
 using HarmonyLib;
 
 //original work done by KK
@@ -145,17 +144,17 @@ namespace _7DTDWebsockets.patchs
             }
 
             DebugLog.Out("[PatchEntityDeath] sending PlayerKillEntity event");
-            API.Send("PlayerKillEntity", JsonConvert.SerializeObject(new PlayerKillEntityEvent(new Player(player), entityNameLower, isAnimal, isZombie, player.inventory.holdingItem.Name, IsHeadshot)));
+            API.Send("PlayerKillEntity", new PlayerKillEntityEvent(new Player(player), entityNameLower, isAnimal, isZombie, player.inventory.holdingItem.Name, IsHeadshot));
 
             if (isZombie)
             {
                 DebugLog.Out("[PatchEntityDeath] sending PlayerKillZombie event");
-                API.Send("PlayerKillZombie", JsonConvert.SerializeObject(new PlayerEntityEvent(new Player(player), entityNameLower)));
+                API.Send("PlayerKillZombie", new PlayerEntityEvent(new Player(player), entityNameLower));
             }
             else if (isAnimal)
             {
                 DebugLog.Out("[PatchEntityDeath] sending PlayerKillAnimal event");
-                API.Send("PlayerKillAnimal", JsonConvert.SerializeObject(new PlayerEntityEvent(new Player(player), entityNameLower)));
+                API.Send("PlayerKillAnimal", new PlayerEntityEvent(new Player(player), entityNameLower));
             }
 
             DebugLog.Out("[PatchEntityDeath] Prefix end, returning true");
@@ -195,15 +194,15 @@ namespace _7DTDWebsockets.patchs
                 return;
             }
 
-            NetPackageDamageEntity damage = (NetPackageDamageEntity)__instance;
-            Entity entity = _world.GetEntity(damage.entityId);
+            var damage = (NetPackageDamageEntity)__instance;
+            var entity = _world.GetEntity(damage.entityId);
             if (entity == null || !(entity is EntityPlayer entityPlayer))
             {
                 return;
             }
 
             DebugLog.Out("[DamagePatches] DamageEntityPacketProccessPrefix sending PlayerDamage event.");
-            API.Send("PlayerDamage", JsonConvert.SerializeObject(new PlayerDmgEvent(new Player(entityPlayer), damage.damageTyp.ToString(), damage.strength)));
+            API.Send("PlayerDamage", new PlayerDmgEvent(new Player(entityPlayer), damage.damageTyp.ToString(), damage.strength));
         }
 
         [HarmonyPrefix]
@@ -216,7 +215,7 @@ namespace _7DTDWebsockets.patchs
             }
 
             DebugLog.Out("[DamagePatches] EntityAliveDamagePrefix sending PlayerDamage event.");
-            API.Send("PlayerDamage", JsonConvert.SerializeObject(new PlayerDmgEvent(new Player(player), _damageSource.damageType.ToString(), _strength)));
+            API.Send("PlayerDamage", new PlayerDmgEvent(new Player(player), _damageSource.damageType.ToString(), _strength));
             return;
         }
     }
