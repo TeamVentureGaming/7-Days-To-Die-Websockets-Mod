@@ -1,6 +1,5 @@
 ﻿using System.Collections.Concurrent;
 using System.Net;
-using System.Reflection;
 using System.Text;
 using UnityEngine;
 using WebSocketSharp.Server;
@@ -145,47 +144,31 @@ namespace _7DTDWebsockets
             var console = new ConsoleConnection();
             sdtd.ExecuteAsync(command, console);
 
-            var queueField = typeof(SdtdConsole).GetField("m_commandsToExecuteAsync", BindingFlags.NonPublic | BindingFlags.Instance);
-            if (queueField == null)
+            do
             {
-                Log.Error("Could not find field m_commandsToExecuteAsync");
-            }
-            else
-            {
-                do
+                var isStillQueued = false;
+                foreach (var cmd in sdtd.m_commandsToExecuteAsync)
                 {
-                    object? cmdQueue = queueField.GetValue(sdtd);
-                    if (cmdQueue == null)
+// avoid formatting the message if not in debug mode
+#if DEBUG
+                    Log.Out($"[Websocket] Queued command: {cmd.command}");
+#endif
+                    if (StringComparer.Ordinal.Equals(cmd.command, command))
                     {
-                        Log.Warning("Command queue is null.");
-                        break;
+                        Log.Out($"[Websocket] Command still running");
+                        isStillQueued = true;
                     }
+                }
 
-                    if (cmdQueue is not System.Collections.IEnumerable cmds)
-                    {
-                        Log.Warning("Command queue is not enumerable.");
-                        break;
-                    }
+                if (!isStillQueued)
+                {
+                    DebugLog.Out("[Websocket] Command not in queue");
+                    break;
+                }
 
-                    var isStillQueued = false;
-                    foreach (var cmd in cmds)
-                    {
-                        var com = ReflectionUtils.GetValue(cmd, "command");
-                        if (System.Object.ReferenceEquals(com, command))
-                        {
-                            isStillQueued = true;
-                            break;
-                        }
-                    }
-                    if (!isStillQueued)
-                    {
-                        break;
-                    }
-
-                    Thread.Sleep(50);
-                } while (true);
-            }
-
+                Thread.Sleep(50);
+            } while (true);
+            
             return console.GetSentLines();
         }
 
