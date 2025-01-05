@@ -5,6 +5,13 @@
     /// </summary>
     public static class DebugLog  
     {
+        public static void Out(Func<string> message)
+        {
+#if DEBUG
+            Out(message());
+#endif
+        }
+
         //[MethodImpl(MethodImplOptions.AggressiveInlining)] // should probably try to make sure this is inlined so there is zero overhead in Release build
         public static void Out(string message)
         {
@@ -13,10 +20,24 @@
 #endif
         }
 
+        public static void Warning(Func<string> message)
+        {
+#if DEBUG
+            Warning(message());
+#endif
+        }
+
         public static void Warning(string message)
         {
 #if DEBUG
             Log.Warning(message);
+#endif
+        }
+
+        public static void Error(Func<string> message)
+        {
+#if DEBUG
+            Error(message());
 #endif
         }
 

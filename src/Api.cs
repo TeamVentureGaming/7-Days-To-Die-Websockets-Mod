@@ -11,9 +11,14 @@ namespace _7DTDWebsockets
 
         public void InitMod(Mod mod)
         {
-            string path = ModManager.GetMod("WebsocketIntegration").Path + "/Config.xml";
+            ConfigureAndStartWebServer(mod.Path + "/Config.xml");
+            ApplyHarmonyPatches();
+            RegisterEventHandlers();
+        }
 
-            XmlReader reader = XmlReader.Create(path, new XmlReaderSettings
+        private static void ConfigureAndStartWebServer(string path)
+        {
+            var reader = XmlReader.Create(path, new XmlReaderSettings
             {
                 ConformanceLevel = ConformanceLevel.Fragment,
                 IgnoreWhitespace = true,
@@ -60,21 +65,7 @@ namespace _7DTDWebsockets
             }
             #endregion
 
-            Log.Out("[Websocket] Runtime patches initialized");
-            var harmony = new Harmony("com.gmail.kk964gaming.websockets.patch");
-            harmony.PatchAll();
-
-            foreach (var method in harmony.GetPatchedMethods())
-            {
-                Log.Out($"Successfully patched: {method.Name}");
-            }
-
             StartConnection(port, auth);
-            ModEvents.GameShutdown.RegisterHandler(GameShutdown);
-            ModEvents.ChatMessage.RegisterHandler(ChatMessage);
-            ModEvents.PlayerLogin.RegisterHandler(PlayerLogin);
-            ModEvents.PlayerDisconnected.RegisterHandler(PlayerDisconnect);
-            ModEvents.PlayerSpawnedInWorld.RegisterHandler(PlayerSpawnedInWorld);
         }
 
         private static void StartConnection(int port, string auth)
@@ -124,11 +115,30 @@ namespace _7DTDWebsockets
                 return;
             }
 
-// avoid formatting the message if not in debug mode
-#if DEBUG
-            Log.Out($"[Websocket] Sending message: {message}");
-#endif
+            DebugLog.Out(() => $"[Websocket] Sending message: {message}");
             WebsocketConnection.WebSocketInstance.SendBroadcast(message);
+        }
+
+        private static void ApplyHarmonyPatches()
+        {
+            Log.Out("[Websocket] Runtime patches initialized");
+            var harmony = new HarmonyLib.Harmony("com.gmail.kk964gaming.websockets.patch");
+            harmony.PatchAll();
+
+            foreach (var method in harmony.GetPatchedMethods())
+            {
+                Log.Out($"Successfully patched: {method.Name}");
+            }
+        }
+
+        private void RegisterEventHandlers()
+        {
+            ModEvents.GameShutdown.RegisterHandler(GameShutdown);
+            ModEvents.ChatMessage.RegisterHandler(ChatMessage);
+            ModEvents.PlayerLogin.RegisterHandler(PlayerLogin);
+            ModEvents.PlayerDisconnected.RegisterHandler(PlayerDisconnect);
+            ModEvents.PlayerSpawnedInWorld.RegisterHandler(PlayerSpawnedInWorld);
+            ModEvents.EntityKilled.RegisterHandler(EntityKilled);
         }
 
         private void GameShutdown()
@@ -138,28 +148,42 @@ namespace _7DTDWebsockets
 
         private sealed class ChatMsg
         {
-            public readonly Player player;
-            public readonly string Message;
+            public readonly int senderId;
+            public readonly string senderName;
+            public readonly string message;
+            public readonly List<int> recipients;
+            public readonly int echatType;
+            public readonly string chatType;
 
-            public ChatMsg(Player pl, string msg)
+            public ChatMsg(int senderId, string senderName, string message, List<int> recipients, EChatType ct)
             {
-                this.player = pl;
-                this.Message = msg;
+                this.senderId = senderId;
+                this.senderName = senderName;
+                this.message = message;
+                this.recipients = recipients ?? new List<int>(0);
+                this.echatType = (int)ct;
+                this.chatType = ct.ToString();
             }
         }
 
         private bool ChatMessage(ClientInfo clientInfo, EChatType chatType, int senderId, string message, string mainName, List<int> recipientEntityIds)
         {
-            if (clientInfo == null || string.IsNullOrEmpty(message))
+            DebugLog.Out(() => $"[Websocket] Chat type: {chatType}, sender id: {senderId}, message: {message}, mainName: {mainName}, recipients: {(recipientEntityIds != null ? string.Join(", ", recipientEntityIds) : string.Empty)}");
+
+            // TODO: need to check this in multiplayer, but this being null does not seem to be an issue actually
+            //if (clientInfo == null)
+            //{
+            //    Log.Warning("[Websocket] Chat Message event was sent, but no client info provided.  Ignoring.");
+            //    return true;
+            //}
+
+            if (string.IsNullOrEmpty(message))
             {
+                Log.Warning("[Websocket] Chat Message event was sent, but message is empty.  Ignoring.");
                 return true;
             }
 
-// avoid formatting the message if not in debug mode
-#if DEBUG
-            Log.Out($"[Websocket] Chat type: {chatType}, message: {message}");
-#endif
-            Send("ChatMessage", new ChatMsg(new Player(clientInfo), message));
+            Send("ChatMessage", new ChatMsg(senderId, mainName, message, recipientEntityIds, chatType));
             return true;
         }
 
@@ -177,6 +201,7 @@ namespace _7DTDWebsockets
         {
             if (clientInfo == null)
             {
+                Log.Warning("[Websocket] Player Login event was sent, but no client info provided.  Ignoring.");
                 return true;
             }
 
@@ -188,6 +213,7 @@ namespace _7DTDWebsockets
         {
             if (clientInfo == null)
             {
+                Log.Warning("[Websocket] Player Disconnect event was sent, but no client info provided.  Ignoring.");
                 return;
             }
 
@@ -210,10 +236,87 @@ namespace _7DTDWebsockets
         {
             if (clientInfo == null)
             {
+                Log.Warning("[Websocket] Player Spawn In event was sent, but no client info provided.  Ignoring.");
                 return;
             }
 
             Send("PlayerSpawn", new PlayerSpawnIn(new Player(clientInfo), respawnType.ToString()));
+        }
+
+        private void EntityKilled(Entity killed, Entity killedBy)
+        {
+            DebugLog.Out(() => $"[Websocket] Entity Killed event => Killed: {FormatEntityString(killed)} | Killed By: {FormatEntityString(killedBy)}");
+            if (killed == null)
+            {
+                Log.Warning("[Websockets] Entity Killed event was sent, but the killed entity was not provided.  Ignoring.");
+                return;
+            }
+
+            if (killedBy == null) // entity was killed by something in the world like a mine or spikes
+            {
+                // TODO: raise some sort of event for things killed by the world
+                DebugLog.Warning("[Websockets] Entity Killed event was sent, but the killed by entity was not provided so something in the world like a mine or trap killed the entity.  Ignoring.");
+                return;
+            }
+
+            if (killedBy is not EntityPlayer killingPlayer)
+            {
+                // TODO: raise some sort of event for things killed by non-players (zombie vs animal?)
+                DebugLog.Warning("[Websockets] Entity Killed event was sent, but the killed by entity was not a player.  Ignoring.");
+                return;
+            }
+
+            var player = new Player(killedBy.name);
+            var isZombie = false;
+            var isAnimal = false;
+            var isPlayer = false;
+            var killedName = string.Empty;
+            bool isHeadshot = false;
+
+            if (killed is EntityZombie killedZombie)
+            {
+                isZombie = true;
+                var eHit = killedZombie.bodyDamage.bodyPartHit;
+                isHeadshot = eHit == EnumBodyPartHit.Head;
+                killedName = killed.GetDebugName().Replace("zombie", "");
+                DebugLog.Out(() => $"Player Killed Zombie ({killedName}) by hitting {eHit}.  Is Headshot: {isHeadshot}.");
+                Send("PlayerKillZombie", new patchs.PlayerEntityEvent(player, killedName));
+            }
+            else if (killed is EntityAnimal killedAnimal)
+            {
+                isAnimal = true;
+                var eHit = killedAnimal.bodyDamage.bodyPartHit;
+                isHeadshot = eHit == EnumBodyPartHit.Head;
+                killedName = killed.GetDebugName().Replace("animal", "");
+                DebugLog.Out(() => $"Player Killed Animal ({killedName}) by hitting {eHit}.  Is Headshot: {isHeadshot}.");
+                Send("PlayerKillAnimal", new patchs.PlayerEntityEvent(player, killedName));
+            }
+            else if (killed is EntityPlayer killedPlayer)
+            {
+                isPlayer = true;
+                var eHit = killedPlayer.bodyDamage.bodyPartHit;
+                isHeadshot = eHit == EnumBodyPartHit.Head;
+                killedName = killedPlayer.name;
+                DebugLog.Out(() => $"Player Killed another Player ({killedName}) by hitting {eHit}.  Is Headshot: {isHeadshot}.");
+                Send("PlayerKillPlayer", new patchs.PlayerEntityEvent(player, killedName));
+            }
+            else
+            {
+                Log.Warning("[Websocket] Entity Killed event, but entity killed was not one of the expected types of entities.  Ignoring.");
+                return;
+            }
+
+            Send("PlayerKillEntity", new patchs.PlayerKillEntityEvent(player, killedName, isAnimal, isZombie, killingPlayer.inventory.holdingItem.Name, isHeadshot));
+        }
+
+        private static string FormatEntityString(Entity a)
+        {
+            if (a == null)
+            {
+                return "(null)";
+            }
+
+            return $"CSTYPE: {a.GetType().FullName} :: Name: {a.name}, Was => Is Dead: {a.bWasDead} => {a.bDead}, Belongs Player Id: {a.belongsPlayerId}, Client Entity Id: {a.clientEntityId}, Entity Class: {a.EntityClass}, entityClass: {a.entityClass}, Entity Id: {a.entityId}, Spawn By (Id / Name): {a.spawnById} / {a.spawnByName}";
         }
     }
 }

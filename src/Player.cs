@@ -13,5 +13,10 @@
         {
             this.name = player.EntityName;
         }
+
+        public Player(string name)
+        {
+            this.name = name;
+        }
     }
 }
