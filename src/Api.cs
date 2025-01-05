@@ -280,7 +280,7 @@ namespace _7DTDWebsockets
                 isHeadshot = eHit == EnumBodyPartHit.Head;
                 killedName = killed.GetDebugName().Replace("zombie", "");
                 DebugLog.Out(() => $"Player Killed Zombie ({killedName}) by hitting {eHit}.  Is Headshot: {isHeadshot}.");
-                Send("PlayerKillZombie", new patchs.PlayerEntityEvent(player, killedName));
+                Send("PlayerKillZombie", new PlayerEntityEvent(player, killedName));
             }
             else if (killed is EntityAnimal killedAnimal)
             {
@@ -289,7 +289,7 @@ namespace _7DTDWebsockets
                 isHeadshot = eHit == EnumBodyPartHit.Head;
                 killedName = killed.GetDebugName().Replace("animal", "");
                 DebugLog.Out(() => $"Player Killed Animal ({killedName}) by hitting {eHit}.  Is Headshot: {isHeadshot}.");
-                Send("PlayerKillAnimal", new patchs.PlayerEntityEvent(player, killedName));
+                Send("PlayerKillAnimal", new PlayerEntityEvent(player, killedName));
             }
             else if (killed is EntityPlayer killedPlayer)
             {
@@ -298,7 +298,7 @@ namespace _7DTDWebsockets
                 isHeadshot = eHit == EnumBodyPartHit.Head;
                 killedName = killedPlayer.name;
                 DebugLog.Out(() => $"Player Killed another Player ({killedName}) by hitting {eHit}.  Is Headshot: {isHeadshot}.");
-                Send("PlayerKillPlayer", new patchs.PlayerEntityEvent(player, killedName));
+                Send("PlayerKillPlayer", new PlayerEntityEvent(player, killedName));
             }
             else
             {
@@ -306,7 +306,7 @@ namespace _7DTDWebsockets
                 return;
             }
 
-            Send("PlayerKillEntity", new patchs.PlayerKillEntityEvent(player, killedName, isAnimal, isZombie, killingPlayer.inventory.holdingItem.Name, isHeadshot));
+            Send("PlayerKillEntity", new PlayerKillEntityEvent(player, killedName, isAnimal, isZombie, killingPlayer.inventory.holdingItem.Name, isHeadshot));
         }
 
         private static string FormatEntityString(Entity a)
