@@ -139,13 +139,10 @@ namespace _7DTDWebsockets.Connections
                 var isStillQueued = false;
                 foreach (var cmd in sdtd.m_commandsToExecuteAsync)
                 {
-// avoid formatting the message if not in debug mode
-#if DEBUG
-                    Log.Out($"[Websocket] Queued command: {cmd.command}");
-#endif
+                    DebugLog.Out(() => $"[Websocket] Queued command: {cmd.command}");
                     if (StringComparer.Ordinal.Equals(cmd.command, command))
                     {
-                        Log.Out($"[Websocket] Command still running");
+                        DebugLog.Out("[Websocket] Command still running");
                         isStillQueued = true;
                     }
                 }

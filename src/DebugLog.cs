@@ -8,6 +8,13 @@ namespace _7DTDWebsockets
     /// </summary>
     public static class DebugLog
     {
+        public static void Out(System.Func<string> message)
+        {
+#if DEBUG
+            Out(message());
+#endif
+        }
+
         public static void Out(string message)
         {
 #if DEBUG
@@ -15,10 +22,24 @@ namespace _7DTDWebsockets
 #endif
         }
 
+        public static void Warning(System.Func<string> message)
+        {
+#if DEBUG
+            Warning(message());
+#endif
+        }
+
         public static void Warning(string message)
         {
 #if DEBUG
             Log.Warning(message);
+#endif
+        }
+
+        public static void Error(System.Func<string> message)
+        {
+#if DEBUG
+            Error(message());
 #endif
         }
 

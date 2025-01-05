@@ -1,8 +1,8 @@
 ﻿namespace _7DTDWebsockets
 {
-    public class Player
+    public sealed class Player
     {
-        public string name;
+        public readonly string name;
 
         public Player(ClientInfo clientInfo)
         {
@@ -12,6 +12,11 @@
         public Player(EntityPlayer player)
         {
             this.name = player.EntityName;
+        }
+
+        public Player(string name)
+        {
+            this.name = name;
         }
     }
 }
