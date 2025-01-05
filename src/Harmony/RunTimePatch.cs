@@ -52,6 +52,22 @@ namespace _7DTDWebsockets.patchs
         }
     }
 
+    public sealed class PlayerKilledZombieEvent
+    {
+        public readonly Player player;
+        public readonly string entity;
+        public readonly bool feral;
+        public readonly bool radiated;
+
+        public PlayerKilledZombieEvent(Player player, string entity, bool feral, bool radiated)
+        {
+            this.player = player;
+            this.entity = entity;
+            this.feral = feral;
+            this.radiated = radiated;
+        }
+    }
+
     public sealed class PlayerOnlyEvent
     {
         public readonly Player player;
