@@ -1,7 +1,10 @@
 ﻿using System.Text;
 using System.Text.Json;
 using System.Xml;
-using HarmonyLib;
+
+//original work done by KK
+//removed some unecessary using statements and slight change to authentication method by Mustached_Maniac
+//fixed to work with 1.0 release and major refactoring of code by Team Venture Gaming
 
 namespace _7DTDWebsockets
 {

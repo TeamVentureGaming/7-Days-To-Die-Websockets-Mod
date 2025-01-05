@@ -4,6 +4,8 @@ using System.Text;
 using UnityEngine;
 using WebSocketSharp.Server;
 
+// update RunCommand to not use reflection, updated console connection to use ConcurrentQueue and refactored file - TVG
+
 namespace _7DTDWebsockets
 {
     public sealed class HttpConnection
