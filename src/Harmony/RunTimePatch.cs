@@ -1,8 +1,8 @@
-﻿using System.Text.RegularExpressions;
-using HarmonyLib;
+﻿using HarmonyLib;
 
 //original work done by KK
 //modifications for patching weaponType and headshots added from Mustached_Maniac
+//remove SetDead patch and static headshot tracking in favor of using EntityKilled event, removed Regex, and refactor by Team Venture Gaming
 
 namespace _7DTDWebsockets.patchs
 {

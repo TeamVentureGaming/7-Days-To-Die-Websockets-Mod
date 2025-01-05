@@ -1,7 +1,4 @@
-﻿//original work done by KK
-//removed some unecessary using statements and slight change to authentication method by Mustached_Maniac
-
-namespace _7DTDWebsockets
+﻿namespace _7DTDWebsockets
 {
     /// <summary>
     /// Helper to allow extensive debug logging when building a debug version of the mod
@@ -15,6 +12,7 @@ namespace _7DTDWebsockets
 #endif
         }
 
+        //[MethodImpl(MethodImplOptions.AggressiveInlining)] // should probably try to make sure this is inlined so there is zero overhead in Release build
         public static void Out(string message)
         {
 #if DEBUG

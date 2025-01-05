@@ -6,6 +6,8 @@ using System.Text;
 using System.Threading;
 using WebSocketSharp.Server;
 
+// update RunCommand to not use reflection and refactored file - TVG
+
 namespace _7DTDWebsockets.Connections
 {
     internal sealed class HttpConnection

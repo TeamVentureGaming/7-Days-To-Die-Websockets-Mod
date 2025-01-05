@@ -6,6 +6,7 @@ using UnityEngine;
 
 //original work done by KK
 //removed unecessary using statements -MM
+//updated to use ConcurrentQueue - TVG
 
 namespace _7DTDWebsockets.Connections
 {
