@@ -202,6 +202,7 @@ namespace _7DTDWebsockets
 
         private bool PlayerLogin(ClientInfo clientInfo, string noIdea, StringBuilder stringBuilder)
         {
+            DebugLog.Out(() => $"{noIdea} :: {stringBuilder?.ToString() ?? "(null)"}");
             if (clientInfo == null)
             {
                 Log.Warning("[Websocket] Player Login event was sent, but no client info provided.  Ignoring.");
@@ -269,7 +270,7 @@ namespace _7DTDWebsockets
                 return;
             }
 
-            var player = new Player(killedBy.name);
+            var player = new Player(killingPlayer.GetDebugName()); // name seems to have "Player_{playerId}" as the value, but GetDebugName() has the player's name
             var isZombie = false;
             var isAnimal = false;
             var isPlayer = false;
@@ -282,8 +283,32 @@ namespace _7DTDWebsockets
                 var eHit = killedZombie.bodyDamage.bodyPartHit;
                 isHeadshot = eHit == EnumBodyPartHit.Head;
                 killedName = killed.GetDebugName().Replace("zombie", "");
-                DebugLog.Out(() => $"Player Killed Zombie ({killedName}) by hitting {eHit}.  Is Headshot: {isHeadshot}.");
-                Send("PlayerKillZombie", new PlayerEntityEvent(player, killedName));
+                // TODO: could provide more info around Feral / Rad
+                bool isFeral = killedZombie.IsFeral;
+                bool isRadiated = false;
+                if (killedZombie.IsFeral)
+                {
+                    isRadiated = killedName.Contains("Radiated");
+
+                    // TODO: I think this implementation would be preferred so we can have the zombie type and modifiers separate instead of baked in the name
+                    //var length = killedName.Length;
+                    //killedName = killedName.Replace("Feral", "");
+                    //if (killedName.Length == length) // feral was not in the name, so it's probably radiated
+                    //{
+                    //    killedName = killedName.Replace("Radiated", "");
+                    //    if (killedName.Length == length) // radiated was not in the name, so it doesn't seem to follow the expected naming
+                    //    {
+                    //        DebugLog.Warning("[Websockets] Killed zombie is feral, but name was not in expected format.");
+                    //    }
+                    //    else
+                    //    {
+                    //        isRadiated = true;
+                    //    }
+                    //}
+                }
+
+                DebugLog.Out(() => $"Player Killed Zombie ({killedName}) by hitting {eHit}.  Is Headshot: {isHeadshot}.  Is Feral: {killedZombie.IsFeral}.  Is Radiated: {isRadiated}");
+                Send("PlayerKillZombie", new PlayerKilledZombieEvent(player, killedName, isFeral, isRadiated));
             }
             else if (killed is EntityAnimal killedAnimal)
             {
@@ -294,12 +319,21 @@ namespace _7DTDWebsockets
                 DebugLog.Out(() => $"Player Killed Animal ({killedName}) by hitting {eHit}.  Is Headshot: {isHeadshot}.");
                 Send("PlayerKillAnimal", new PlayerEntityEvent(player, killedName));
             }
+            else if (killed is EntityEnemyAnimal killedEnemyAnimal)
+            {
+                isAnimal = true;
+                var eHit = killedEnemyAnimal.bodyDamage.bodyPartHit;
+                isHeadshot = eHit == EnumBodyPartHit.Head;
+                killedName = killed.GetDebugName().Replace("animal", "");
+                DebugLog.Out(() => $"Player Killed Enemy Animal ({killedName}) by hitting {eHit}.  Is Headshot: {isHeadshot}.");
+                Send("PlayerKillAnimal", new PlayerEntityEvent(player, killedName));
+            }
             else if (killed is EntityPlayer killedPlayer)
             {
                 isPlayer = true;
                 var eHit = killedPlayer.bodyDamage.bodyPartHit;
                 isHeadshot = eHit == EnumBodyPartHit.Head;
-                killedName = killedPlayer.name;
+                killedName = killedPlayer.GetDebugName(); // name seems to have "Player_{playerId}" as the value, but GetDebugName() has the player's name
                 DebugLog.Out(() => $"Player Killed another Player ({killedName}) by hitting {eHit}.  Is Headshot: {isHeadshot}.");
                 Send("PlayerKillPlayer", new PlayerEntityEvent(player, killedName));
             }
@@ -319,7 +353,7 @@ namespace _7DTDWebsockets
                 return "(null)";
             }
 
-            return $"CSTYPE: {a.GetType().FullName} :: Name: {a.name}, Was => Is Dead: {a.bWasDead} => {a.bDead}, Belongs Player Id: {a.belongsPlayerId}, Client Entity Id: {a.clientEntityId}, Entity Class: {a.EntityClass}, entityClass: {a.entityClass}, Entity Id: {a.entityId}, Spawn By (Id / Name): {a.spawnById} / {a.spawnByName}";
+            return $"CS_TYPE: {a.GetType().FullName} :: DEBUG_NAME: {a.GetDebugName()} :: Name: {a.name}, Was => Is Dead: {a.bWasDead} => {a.bDead}, Belongs Player Id: {a.belongsPlayerId}, Client Entity Id: {a.clientEntityId}, Entity Id: {a.entityId}, Spawn By (Id / Name): {a.spawnById} / {a.spawnByName}";
         }
     }
 }
